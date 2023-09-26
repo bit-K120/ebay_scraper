@@ -15,12 +15,11 @@ from openpyxl import load_workbook
 import json
 import os
 
-
 wb = load_workbook("Scrape_Control.xlsm")
 ws = wb.active
 pre_d = [tuple(cell for cell in data if cell is not None)
-    for data in ws.iter_rows(values_only=True) if any(cell for cell in data)]
-d = dict(zip(pre_d[0],pre_d[1]))
+         for data in ws.iter_rows(values_only=True) if any(cell for cell in data)]
+d = dict(zip(pre_d[0], pre_d[1]))
 search_word = d["keyword"]
 num_item_look_up = int(d["N item to look up"]) // 60
 num_co_words = int(d["N of corresponding words"])
@@ -39,10 +38,11 @@ def setup_browser():
     browser = webdriver.Firefox(service=Service(driver_path), options=options)
     return browser
 
+
 def open_browser(browser):
-    l_by_id = ["gh-la","gh-eb-Geo-a-en",]
-    l_by_css = [".gh-eb-Geo-flag.gh-sprRetina",".gh-eb-li-a.gh-icon",".menu-button__button.btn.btn--secondary",
-                ".menu-button__item span[data-country='USA|US']",".shipto__close-btn"]
+    l_by_id = ["gh-la", "gh-eb-Geo-a-en", ]
+    l_by_css = [".gh-eb-Geo-flag.gh-sprRetina", ".gh-eb-li-a.gh-icon", ".menu-button__button.btn.btn--secondary",
+                ".menu-button__item span[data-country='USA|US']", ".shipto__close-btn"]
     wait = WebDriverWait(browser, 10)
     url = "https://www.ebay.com/"
     browser.get(url)
@@ -54,9 +54,10 @@ def open_browser(browser):
     language_toggle_2.click()
     sleep(2)  # for stable functioning
     for element in l_by_css[1:]:
-        element_finder_id = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR,element)))
+        element_finder_id = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, element)))
         element_finder_id.click()
         sleep(1)
+
 
 def set_parameter(search_word, browser):
     l_el_id = ["_nkw", "s0-1-17-4[0]-7[1]-_in_kw", "s0-1-17-5[1]-[2]-LH_Sold",
@@ -87,11 +88,11 @@ def set_parameter(search_word, browser):
 def date_extraction(browser):
     html = browser.page_source
     soup = BeautifulSoup(html, "html.parser")
-    soup_all = soup.find_all("div", attrs={"class": "s-item__info clearfix"}) # 各商品の文章要素全体
+    soup_all = soup.find_all("div", attrs={"class": "s-item__info clearfix"})  # 各商品の文章要素全体
     item_date = None  # item_dateをループ外で使うために
     agg_list = []
     i = 0
-    while i < num_item_look_up: #ページをめくる回数
+    while i < num_item_look_up:  # ページをめくる回数
         for j in range(len(soup_all)):  # 商品の名前と日付を取得するループ
             item_x = soup_all[j]
             item_name_0 = item_x.find("span", attrs={"role": "heading"})
@@ -112,13 +113,15 @@ def date_extraction(browser):
             )
 
             # Scroll to the Next button and click it
-            sleep(8) #ここが早すぎるとすぐにブロックされる
+            sleep(8)  # ここが早すぎるとすぐにブロックされる
             browser.execute_script("arguments[0].scrollIntoView();", next_button)
             next_button.click()
         except Exception as e:
             print("An error occurred while clicking the Next button:", e)
         i += 1
     return agg_list
+
+
 def data_sorting(agg_list, browser):
     one_month_ago = datetime.now() - timedelta(days=30)
     month_list = [{date: item} for temp_dict in agg_list for date, item in temp_dict.items() if
@@ -126,14 +129,14 @@ def data_sorting(agg_list, browser):
     # 同じワードを含むものを抽出
     print(len(month_list))
     all_list = []
-    counter= 1
+    counter = 1
     i = 1
     items = [item_names for temp_dict in month_list for item_names in temp_dict.values()]
 
-    for index_1,item_1 in enumerate(items): #取得してきたデータの商品名部分のみ抽出
+    for index_1, item_1 in enumerate(items):  # 取得してきたデータの商品名部分のみ抽出
         item_1_added = False
         split_item_1 = set(item_1.split())
-        for index_2, item_2 in enumerate(items[index_1+1:], start=index_1+1):
+        for index_2, item_2 in enumerate(items[index_1 + 1:], start=index_1 + 1):
             split_item_2 = set(item_2.split())
             common_words = split_item_2.intersection(split_item_1)
             if len(common_words) >= num_co_words:
@@ -146,8 +149,7 @@ def data_sorting(agg_list, browser):
                 else:
                     all_list.append(month_list[index_2])
 
-
-    print("all_list:",all_list)
+    print("all_list:", all_list)
     print(len(all_list))
     wb = xw.Book.caller()  # This gets the calling Excel workbook
     ws = wb.sheets['Scrape_Control']  # This gets the Sheet1 of that workbook
@@ -155,6 +157,8 @@ def data_sorting(agg_list, browser):
     ws.range('D8').value = len(all_list)
     browser.quit()
     return all_list
+
+
 def sort_for_csv(all_list):
     final_data = []
     for sub_dict in all_list:
@@ -170,12 +174,13 @@ def sort_for_csv(all_list):
 
 
 def main_function():
-    browser=setup_browser()
+    browser = setup_browser()
     open_browser(browser)
-    set_parameter(search_word,browser)
-    agg_list=date_extraction(browser)
-    all_list = data_sorting(agg_list,browser)
+    set_parameter(search_word, browser)
+    agg_list = date_extraction(browser)
+    all_list = data_sorting(agg_list, browser)
     sort_for_csv(all_list)
+
 
 def export_to_csv():
     wb = xw.Book("Scrape_Control.xlsm")
@@ -194,11 +199,6 @@ def export_to_csv():
         print(f"the exporting file name is {file_name}")
         df = pd.DataFrame(final_data)
         df.index = df.index + 1
-        df.to_csv(fr"INSERT_YOUR_DIRECTORY_HERE{file_name}.csv"", encoding="utf-8-sig", index_label="Index")
+        df.to_csv(fr"C:\Users\kayug\Portofolio_1\ebay_scraper\{file_name}.csv", encoding="utf-8-sig", index_label="Index")
     except Exception as e:
         print(f"An error occurred: {e}")
-
-
-
-
-
